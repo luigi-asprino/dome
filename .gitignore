@@ -1,0 +1,14 @@
+/target/
+.DS_Store
+.classpath
+.idea/
+.project
+.settings/
+__pycache__/
+annotated_domains/
+annotated_domains_exclude_words/
+dbpedia/
+exp_hierarchy/
+src/main/resources/ESG_DBpedia_Cat
+input/
+log/
