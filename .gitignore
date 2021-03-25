@@ -12,3 +12,10 @@ exp_hierarchy/
 src/main/resources/ESG_DBpedia_Cat
 input/
 log/
+wd_2019-02-24.bow.pkl
+wd_2019-02-24.pgrank.npy
+wd_categories/
+solr-8.8.1/
+solr-8.8.1.tgz
+sample_classifier.pkl
+/opentapioca/
