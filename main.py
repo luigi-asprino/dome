@@ -133,7 +133,13 @@ def load_domain_hierarchy(filename, uri2id):
 
 if __name__ == '__main__':
     # test_faiss()
-    input_folder = "input/"
+
+    # arguments
+    use_hierarchy = False
+    input_folder = "input_wd/"
+    outfolder = "annotated_domains"
+
+    print("loading domain2id map")
     domain_to_id = load_map_from_file(input_folder + "domain2id")
     id_to_domain = {v: k for k, v in domain_to_id.items()}
     print("domain2id map loaded")
@@ -145,19 +151,22 @@ if __name__ == '__main__':
                  "https://w3id.org/framester/wn/wn30/wndomains/wn-domain-social_science",
                  "https://w3id.org/framester/wn/wn30/wndomains/wn-domain-doctrines"]
 
-    domain_hierarchy_ids = load_domain_hierarchy(input_folder + "domain_hierarchy.csv", domain_to_id)
-
+    print("creating word index")
     index, word_list, trigramToId = create_index_from_file(input_folder + "word2id")
+    print("word index created")
 
+    print("loading tf-idf corpus")
     tfidf_corpus_file = input_folder + "tfidf_corpus"
     dictionary_file = input_folder + "dictionary"
     corpus_tfidf = corpora.MmCorpus(tfidf_corpus_file)
-    print("corpus tf-idf loaded")
+    print("tf-idf corpus loaded")
+    print("loading corpus")
     dictionary = corpora.Dictionary.load(dictionary_file)
     id_to_dictionary_token = {v: k for k, v in dictionary.token2id.items()}
     print("dictionary loaded")
-    k=1
+    k = 1
 
+    print("loading word2id map")
     wnword_to_id = load_map_from_file(input_folder + "word2id")
     id_to_wnword = {v: k for k, v in wnword_to_id.items()}
     print("word2id map loaded")
@@ -166,6 +175,7 @@ if __name__ == '__main__':
     #id_to_wnworduri = {v: k for k, v in wnworduri_to_id.items()}
     #print("uri2id map loaded")
 
+    print("loading word-domain matrix")
     num_domains = max(id_to_domain.keys()) + 1
     num_wn_words = max(id_to_wnword.keys()) + 1
     word_domain_matrix = load_matrix_from_file(input_folder + "word_domain_matrix", num_wn_words, num_domains)
@@ -173,23 +183,27 @@ if __name__ == '__main__':
 
     doc_domain_matrix = np.zeros((len(corpus_tfidf),num_domains))
 
+    print("Loading Id2OntologyUri")
     uriOntology2Id = load_map_from_file(input_folder + "uriOntology2Id.tsv")
     Id2OntologyUri = {v: k for k, v in uriOntology2Id.items()}
     print("Id2OntologyUri map loaded")
 
+    print("Loading doc_ids")
     df = pd.read_csv(input_folder + "doc_ids", sep='\t', header=None, usecols=[0])
     doc_ids = [row[0] for index, row in df.iterrows()]
+    print("doc_ids loaded")
 
-    outfolder = "annotated_domains"
     if (not os.path.exists(outfolder)):
         os.mkdir(outfolder)
 
     words_to_exclude = ["property", "label", "comment", "class", "restriction", "ontology", "nil", "individual", "value", "domain", "range", "first", "rest", "datatype", "integer"]
 
     ### TODO Convert Dictionary Not Documents!
+    if (use_hierarchy):
+        domain_hierarchy_ids = load_domain_hierarchy(input_folder + "domain_hierarchy.csv", domain_to_id)
 
     for doc_id in range(0, len(corpus_tfidf)):
-        doc_words = [id_to_dictionary_token[tf[0]] for tf in corpus_tfidf[doc_id]]
+        doc_words = [id_to_dictionary_token[tf[0]] for tf in corpus_tfidf[doc_id]] # retrieving words of doc
         print(f"Processing file {doc_id} size: {len(doc_words)} {Id2OntologyUri[doc_ids[doc_id]]}")
         xq = word_list_to_trigram_matrix(doc_words, trigramToId)
         D, I = index.search(xq, k)
@@ -198,7 +212,7 @@ if __name__ == '__main__':
                 wn_word_id = I[i][ii] # wn word_id
                 sim = 1 - D[i][ii]
                 if not wn_word_id in id_to_wnword:
-                    print(f"Couldn't find wordnet word with id {wn_word_id}")
+                    print(f"Couldn't find word with id {wn_word_id}")
                     continue
 
                 #if not id_to_wnword[wn_word_id] in words_to_exclude: # exclude words from domain computation
@@ -207,12 +221,14 @@ if __name__ == '__main__':
                         doc_domain_matrix[doc_id][domain_id] += sim * corpus_tfidf[doc_id][i][1] # word simiarity * tf-idf of word
 
         # use domain hierarchy to reinforce top-level domains
-        for domain_id in range(0, num_domains):
-            if domain_id in domain_hierarchy_ids:
-                for sub_domain in domain_hierarchy_ids[domain_id]:
-                    doc_domain_matrix[doc_id][domain_id] += doc_domain_matrix[doc_id][sub_domain]
+        if(use_hierarchy):
+            for domain_id in range(0, num_domains):
+                if domain_id in domain_hierarchy_ids:
+                    for sub_domain in domain_hierarchy_ids[domain_id]:
+                        doc_domain_matrix[doc_id][domain_id] += doc_domain_matrix[doc_id][sub_domain]
 
-        doc_domain_matrix[doc_id][domain_to_id["https://w3id.org/framester/wn/wn30/wndomains/wn-domain-factotum"]] = 0.0 # exclude factotum domain
+        # FIXME
+        # doc_domain_matrix[doc_id][domain_to_id["https://w3id.org/framester/wn/wn30/wndomains/wn-domain-factotum"]] = 0.0 # exclude factotum domain
 
         # normalize vector
         #  FIXME /Users/lgu/workspace/ekr/dome/main.py:213: RuntimeWarning: invalid value encountered in true_divide

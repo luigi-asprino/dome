@@ -54,6 +54,8 @@ public class WordToDomainMatrixCreator {
 
 	public static void main(String[] args) throws IOException {
 		QueryExecution qexec = QueryExecutionFactory.sparqlService(endpoint, QueryFactory.create(SELECT_WORDS));
+		String folderOut = "resources/wn_lexicon/";
+		new File(folderOut).mkdirs();
 
 		ResultSet rs = qexec.execSelect();
 
@@ -62,8 +64,8 @@ public class WordToDomainMatrixCreator {
 
 		Map<String, Integer> wnDomainToID = getDomains();
 
-		FileOutputStream fos = new FileOutputStream(new File("wordIDs"));
-		FileOutputStream fosWordToDomainMatrix = new FileOutputStream(new File("wordToDomainMatrix"));
+		FileOutputStream fos = new FileOutputStream(new File(folderOut + "/wordIDs"));
+		FileOutputStream fosWordToDomainMatrix = new FileOutputStream(new File(folderOut + "/wordToDomainMatrix"));
 
 		while (rs.hasNext()) {
 

@@ -19,3 +19,7 @@ solr-8.8.1/
 solr-8.8.1.tgz
 sample_classifier.pkl
 /opentapioca/
+outputs/
+BabelDomains_full/
+genre_models/
+resources/
