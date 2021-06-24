@@ -23,3 +23,5 @@ outputs/
 BabelDomains_full/
 genre_models/
 resources/
+fairseq/
+GENRE/
