@@ -6,9 +6,11 @@ import os
 import simplemma
 from rocksdb.merge_operators import StringAppendOperator
 import rocksdb
-import sys
 
 langdata = simplemma.load_data('en', 'it', 'de', 'es', 'fr', 'nl', 'ru')
+
+import logging as logger
+logger.basicConfig( level=logger.INFO)
 
 
 class SimpleDomainDisambiguator:
@@ -140,7 +142,7 @@ def print_domains(wd_item, wditem2id, domain_matrix, id_to_domain):
 
 
 def annotate(id_to_dictionary_token, doc_id, corpus_tfidf, sdds,
-             verbose, words_to_exclude, id_to_domain):
+             verbose, words_to_exclude, id_to_domain, compute_word_per_domain=False):
 
     minus_one=0
     for tf in corpus_tfidf[doc_id]:
@@ -155,6 +157,9 @@ def annotate(id_to_dictionary_token, doc_id, corpus_tfidf, sdds,
     doc_words_all = {id_to_dictionary_token[tf[0]]: tf[1] for tf in corpus_tfidf[doc_id] if
                      (tf[0]> 0 and id_to_dictionary_token[tf[0]] not in words_to_exclude)}
 
+    if compute_word_per_domain:
+        word_per_domain = {}
+
     if (verbose):
         print(doc_words_all)
 
@@ -162,11 +167,20 @@ def annotate(id_to_dictionary_token, doc_id, corpus_tfidf, sdds,
     for w in doc_words_all:
         for sdd in sdds:
             word_domains = sdd.get_domains(w, doc_words_all[w])
+            if compute_word_per_domain:
+                max_domain = np.argmax(word_domains)
+                if max_domain in word_per_domain:
+                    word_per_domain[max_domain].append((w,word_domains[max_domain]))
+                else:
+                    word_per_domain[max_domain] = [(w,word_domains[max_domain])]
             domain_vector += word_domains
 
     norm = np.linalg.norm(domain_vector)
     if norm > 0:
         domain_vector = domain_vector / norm
+
+    if compute_word_per_domain:
+        return domain_vector, doc_words_all, word_per_domain
 
     return domain_vector, doc_words_all
 
@@ -189,6 +203,8 @@ if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser(description='Process some integers.')
+
+    # --input_folder resources/input_wd_6/ --input_folder_corpus /Users/lgu/Desktop/NOTime/EKR/Corpus_lod --input_wn_folder /Users/lgu/workspace/ekr/dome/resources/wn_resources --out_folder /Users/lgu/workspace/ekr/dome/outputs/output_8
 
     parser.add_argument('--input_folder', dest='input_folder', default='resources/input_wd_6/', help='The folder containing ... ')
     parser.add_argument('--input_folder_corpus', dest='input_folder_corpus', default='resources/input_wd_6/', help='The folder containing ... ')
@@ -309,7 +325,8 @@ if __name__ == '__main__':
 
     words_to_exclude = ["property", "label", "comment", "class", "restriction", "ontology", "nil", "individual",
                         "value", "domain", "range", "first", "rest", "resource", "datatype", "integer", "equivalent",
-                        "title", "thing", "creator", "disjoint", "dublin", "taxonomy", "axiom"]
+                        "title", "thing", "creator", "disjoint", "predicate", "dublin", "taxonomy", "axiom", "foaf", "dc",
+                        "boolean", "xml", "httpd", "https"]
 
     sdd_wn = SimpleDomainDisambiguator(wn_word_to_id, [domain_matrix_wordnet], id_to_domain)
 
@@ -317,12 +334,18 @@ if __name__ == '__main__':
 
     dd_db = RocksDBDomainDisambiguator("resources/bn", id_to_domain)
 
-    # dd_db.print_domains(dd_db.get_domains("Italia"))
-
     domain_vectors = np.zeros((len(corpus_tfidf),len(id_to_domain)))
 
     if not args.limit:
         limit = len(corpus_tfidf)
+
+    #dv, words = annotate(id_to_dictionary_token, 7, corpus_tfidf, [sdd_wn, dd_db],
+    #         verbose, words_to_exclude, id_to_domain)
+
+    #dd_db.print_domains(dv)
+
+    #print(words)
+    #quit()
 
     for doc_id in range(0, min(len(corpus_tfidf), limit)):
 
