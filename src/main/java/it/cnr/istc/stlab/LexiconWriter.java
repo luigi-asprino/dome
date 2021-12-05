@@ -34,9 +34,9 @@ import it.cnr.istc.stlab.rocksmap.RocksMap;
 import it.cnr.istc.stlab.rocksmap.RocksMultiMap;
 import it.cnr.istc.stlab.rocksmap.transformer.StringRocksTransformer;
 
-public class WDLexiconWriter {
+public class LexiconWriter {
 
-	private static final Logger logger = LoggerFactory.getLogger(WDLexiconWriter.class);
+	private static final Logger logger = LoggerFactory.getLogger(LexiconWriter.class);
 
 	public static void function() throws RocksDBException, IOException {
 		String folder = "resources-new";
@@ -93,9 +93,6 @@ public class WDLexiconWriter {
 		FileOutputStream fosWordDomainMatrixBnFOS = new FileOutputStream(new File(fileWordDomainMatrixBn));
 		FileOutputStream fosWordDomainMatrixWnFOS = new FileOutputStream(new File(fileWordDomainMatrixWn));
 
-		rewriteWnCategories(wndomains2EKR, "resources/wn_resources/domain2id",
-				"resources/wn_resources/word_domain_matrix", "resources/wn_resources/word_domain_matrix_ekr", cat2id);
-
 		int max = -1;
 		boolean print = max > 0;
 
@@ -103,9 +100,11 @@ public class WDLexiconWriter {
 		int itemCount = 0;
 
 		while (it.hasNext()) {
+			
 			if (itemCount % 10000 == 0) {
 				logger.info("Processed {}", itemCount);
 			}
+			
 			if (max-- == 0) {
 				break;
 			}

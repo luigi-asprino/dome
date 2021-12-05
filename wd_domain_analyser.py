@@ -47,6 +47,7 @@ class RocksDBDomainDisambiguator(SimpleDomainDisambiguator):
     def __init__(self, dbpath, id_to_domain):
         self.dbpath = dbpath
         self.id_to_domain = id_to_domain
+        self.take_only_max_domain = True
         opts = rocksdb.Options()
         opts.create_if_missing = True
         opts.merge_operator = StringAppendOperator()
@@ -58,7 +59,13 @@ class RocksDBDomainDisambiguator(SimpleDomainDisambiguator):
         split = domain_string.decode().split()
         i = 0
         while i < len(split):
-            result[split[i].replace(",", "")] = float(split[i + 1])
+            score = float(split[i + 1])
+            if split[i] in result:
+                ## domain already within result take the maximum score
+                if score > result[split[i]]:
+                    result[split[i].replace(",","")] = score
+            else:
+                result[split[i].replace(",","")] = score
             i += 2
         return result
 
@@ -70,9 +77,14 @@ class RocksDBDomainDisambiguator(SimpleDomainDisambiguator):
 
         if domain_string != None:
             domains = self.extract_domains(domain_string)
-            for domain in domains:
+            if self.take_only_max_domain:
+                domain = max(domains, key=domains.get)
                 if (domains[domain] <= 1.0 and domains[domain] > 0.0):
                     result[self.domain_to_id[domain]] += word_weight * domains[domain]
+            else:
+                for domain in domains:
+                    if (domains[domain] <= 1.0 and domains[domain] > 0.0):
+                        result[self.domain_to_id[domain]] += word_weight * domains[domain]
         return result
 
 
@@ -211,7 +223,6 @@ if __name__ == '__main__':
     parser.add_argument('--input_wn_folder', dest='input_wn_folder', default='resources/wn_resources/', help='The folder containing ... ')
     parser.add_argument('--out_folder', dest='out_folder', help='The folder containing ... ')
     parser.add_argument('--limit', dest='limit', help='The folder containing ... ')
-    parser.add_argument('--uri_to_ontology_id', dest='uri_to_ontology_id', help='The folder containing ... ')
 
     args = parser.parse_args()
 
@@ -235,6 +246,7 @@ if __name__ == '__main__':
     if args.limit:
         limit = int(args.limit)
         print(f"limit: {limit}")
+
 
     print(f"input_folder: {input_folder}\ninput_folder_corpus: {input_folder_corpus} \ninput_wn_folder: {input_wn_folder}\nout_folder{out_folder}")
 

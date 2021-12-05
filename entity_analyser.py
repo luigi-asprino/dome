@@ -6,14 +6,14 @@ import numpy as np
 from rocksdb.merge_operators import StringAppendOperator
 
 import logging as logger
-logger.basicConfig( level=logger.INFO)
+logger.basicConfig(level=logger.INFO)
 
 def load_list_from_file(filename, extractid=False):
     if (os.path.exists(filename + ".p")):
         return pickle.load(open(filename + ".p", "rb"))
     df = pd.read_csv(filename, sep='\t', header=None, usecols=[0])
     if extractid:
-        result = [row[0].split("/")[4] for index, row in df.iterrows()]
+        result = [row[0].split("/")[5] for index, row in df.iterrows()]
     else:
         result = [row[0] for index, row in df.iterrows()]
     pickle.dump(result, open(filename + ".p", "wb"))
@@ -60,10 +60,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--sum', dest='sum', action='store_true')
 
-
     args = parser.parse_args()
-
-
 
     empty_entities = load_list_from_file(args.empty_entities_path )
     doc_ids = load_list_from_file(args.input_folder_corpus + "/doc_ids", extractid=True)

@@ -25,3 +25,10 @@ genre_models/
 resources/
 fairseq/
 GENRE/
+wn/000003.log
+wn/CURRENT
+wn/IDENTITY
+wn/LOCK
+wn/LOG
+wn/MANIFEST-000001
+wn/OPTIONS-000005
