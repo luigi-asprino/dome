@@ -8,7 +8,7 @@ class DocumentAnnotatorAggregationStrategy(Enum):
 
 class SimpleDocumentAnnotator:
 
-    def __init__(self, id_to_dictionary_token, id_to_domain, sdds, words_to_exclude=[], strategy=DocumentAnnotatorAggregationStrategy.SUM_NORM):
+    def __init__(self, id_to_dictionary_token, id_to_domain, sdds, words_to_exclude=[], strategy=DocumentAnnotatorAggregationStrategy.CENTROID):
         self.id_to_dictionary_token = id_to_dictionary_token
         self.words_to_exclude = words_to_exclude
         self.id_to_domain = id_to_domain

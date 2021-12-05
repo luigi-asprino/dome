@@ -5,7 +5,7 @@ import os
 import simplemma
 from domainannotators.WordAnnotators import RocksDBDomainDisambiguator, AggregationStrategy
 from utils.Utils import load_map_from_file, load_list_from_file
-from domainannotators.DocumentDomainAnnotators import SimpleDocumentAnnotator
+from domainannotators.DocumentDomainAnnotators import SimpleDocumentAnnotator, DocumentAnnotatorAggregationStrategy
 
 langdata = simplemma.load_data('en', 'it', 'de', 'es', 'fr', 'nl', 'ru')
 
@@ -121,7 +121,7 @@ def load_resources(input_folder_corpus, args):
     if (args.gold_standard):
         uri_to_gold_class = load_map_from_file(args.gold_standard)
 
-    da = SimpleDocumentAnnotator(id_to_dictionary_token, id_to_domain, lemma_dbs, words_to_exclude)
+    da = SimpleDocumentAnnotator(id_to_dictionary_token, id_to_domain, lemma_dbs, words_to_exclude, strategy=DocumentAnnotatorAggregationStrategy.CENTROID)
 
     return corpus_tfidf, dictionary, id_to_dictionary_token, id_to_domain, domain_to_id, doc_ids, id2doc, uri_to_doc_id, doc_id_to_uri, words_to_exclude, lemma_dbs, uri_to_gold_class, hierarchy, da
 
