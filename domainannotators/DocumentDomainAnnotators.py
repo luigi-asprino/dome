@@ -1,14 +1,21 @@
 import numpy as np
 from enum import Enum
 
+
 class DocumentAnnotatorAggregationStrategy(Enum):
     SUM = 1
     SUM_NORM = 2
     CENTROID = 3
+    SUM_WORD_MAX = 4
+    SUM_WORD_MAX_GEOMETRIC_FACTOR = 5
+
 
 class SimpleDocumentAnnotator:
 
-    def __init__(self, id_to_dictionary_token, id_to_domain, sdds, words_to_exclude=[], strategy=DocumentAnnotatorAggregationStrategy.CENTROID):
+    def __init__(self, id_to_dictionary_token, id_to_domain, sdds, words_to_exclude=None,
+                 strategy=DocumentAnnotatorAggregationStrategy.SUM_WORD_MAX):
+        if words_to_exclude is None:
+            words_to_exclude = []
         self.id_to_dictionary_token = id_to_dictionary_token
         self.words_to_exclude = words_to_exclude
         self.id_to_domain = id_to_domain
@@ -37,15 +44,22 @@ class SimpleDocumentAnnotator:
         return word_per_domain, not_domain
 
     def get_domain_vector(self, doc):
-        if (self.strategy == DocumentAnnotatorAggregationStrategy.SUM):
+        if self.strategy == DocumentAnnotatorAggregationStrategy.SUM:
             return self.get_domain_vector_sum(doc)
-        elif (self.strategy == DocumentAnnotatorAggregationStrategy.SUM_NORM):
+        elif self.strategy == DocumentAnnotatorAggregationStrategy.SUM_NORM:
             return self.get_domain_vector_sum_norm(doc)
-        elif (self.strategy == DocumentAnnotatorAggregationStrategy.CENTROID):
+        elif self.strategy == DocumentAnnotatorAggregationStrategy.CENTROID:
             return self.get_domain_vector_centroid(doc)
+        elif self.strategy == DocumentAnnotatorAggregationStrategy.SUM_WORD_MAX:
+            return self.get_domain_vector_sum_word_max(doc)
+        elif self.strategy == DocumentAnnotatorAggregationStrategy.SUM_WORD_MAX_GEOMETRIC_FACTOR:
+            return self.get_domain_vector_sum_word_max_geometric_factor(doc)
 
     def get_doc_words_all(self, doc):
-        return {self.id_to_dictionary_token[tf[0]]: tf[1] for tf in doc
+        if isinstance(doc, dict):
+            return doc
+        else:
+            return {self.id_to_dictionary_token[tf[0]]: tf[1] for tf in doc
                 if (tf[0] > 0 and self.id_to_dictionary_token[tf[0]] not in self.words_to_exclude)}
 
     def get_domain_vector_sum(self, doc):
@@ -58,6 +72,22 @@ class SimpleDocumentAnnotator:
             domain_vector += word_domains
         return domain_vector, doc_words_all
 
+    def get_domain_vector_sum_word_max(self, doc):
+        doc_words_all = self.get_doc_words_all(doc)
+        domain_vector = np.zeros((len(self.id_to_domain)))
+        for w in doc_words_all:
+            domain_vector += np.max([sdd.get_domains(w, doc_words_all[w]) for sdd in self.sdds], axis=0)
+        return domain_vector, doc_words_all
+
+    def get_domain_vector_sum_word_max_geometric_factor(self, doc):
+        doc_words_all = self.get_doc_words_all(doc)
+        domain_vector = np.zeros((len(self.id_to_domain)))
+        cnt = 1
+        for w in sorted(doc_words_all.items(), key=lambda item: item[1], reverse=True):
+            domain_vector += (np.max([sdd.get_domains(w[0], w[1]) for sdd in self.sdds], axis=0) / cnt)
+            cnt += 1
+        return domain_vector, doc_words_all
+
     def get_domain_vector_sum_norm(self, doc):
         domain_vector, doc_words_all = self.get_domain_vector_sum(doc)
         norm = np.linalg.norm(domain_vector)
@@ -67,5 +97,7 @@ class SimpleDocumentAnnotator:
 
     def get_domain_vector_centroid(self, doc):
         doc_words_all = self.get_doc_words_all(doc)
-        domain_vector = np.mean([np.mean([sdd.get_domains(w, doc_words_all[w]) for sdd in self.sdds], axis=0) for w in doc_words_all], axis=0)
+        domain_vector = np.mean(
+            [np.mean([sdd.get_domains(w, doc_words_all[w]) for sdd in self.sdds], axis=0) for w in doc_words_all],
+            axis=0)
         return domain_vector, doc_words_all
