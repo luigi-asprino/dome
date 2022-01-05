@@ -58,11 +58,7 @@ def transform_to_powerlabel(y):
 
 
 def transform_to_binary(y_pow, power_label_to_bin):
-    y_res = []
-    for yy in y_pow:
-        y_res.append(power_label_to_bin[yy])
-    return y_res
-
+    return [power_label_to_bin[yy[0]] for yy in y_pow]
 
 
 def load_matrix_from_file(filename, loadscore=False, exclude_null=False, lowercase=False):

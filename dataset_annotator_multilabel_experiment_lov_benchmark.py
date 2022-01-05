@@ -98,7 +98,7 @@ uri_to_doc_id_file = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/output/index.
 gold_standard = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/LOV_KD_annotations.tsv"
 gold_standard_benchmark = "/Users/lgu/Desktop/NOTime/EKR/Benchmark/GoldStandart-MultiTopic.tsv"
 hierarchy_file = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/KD_hierarchy.tsv"
-resampling_strategy = "powerlabel"
+resampling_strategy = "powerlabel_ros"
 virtual_documents_lov = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/output"
 virtual_documents_benchmark = "/Users/lgu/Desktop/NOTime/EKR/Benchmark/virtual_documents"
 uri_to_doc_id_file_benchmark = "/Users/lgu/Desktop/NOTime/EKR/Benchmark/virtual_documents/index.tsv"
@@ -129,10 +129,11 @@ data_lov = load_dataset(virtual_documents_lov, doc_id_to_uri, uri_to_gold_classe
 uri_to_gold_classes_benchmark, headers_benchmark = load_vectors_from_file(gold_standard_benchmark, header=0, usecols=[0,1,2,3,4,5,6])
 
 data_benchmark = load_benchmark(virtual_documents_benchmark, doc_id_to_uri_benchmark, uri_to_gold_classes_benchmark, headers_benchmark, hierarchy)
+#data_benchmark = []
 
 data = data_lov + data_benchmark
 
-df = pd.DataFrame(data, columns=[ 'Class Label', 'Text'])
+df = pd.DataFrame(data, columns=['Class Label', 'Text'])
 
 X = df['Text']
 y = df['Class Label']

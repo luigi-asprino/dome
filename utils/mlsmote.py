@@ -31,8 +31,12 @@ def get_irlb(df):
     n = len(columns)
     irpl = np.zeros(n)
     for column in range(n):
-        irpl[column] = df[columns[column]].value_counts()[1]
-    irpl = max(irpl) / irpl
+        vc = df[columns[column]].value_counts()
+        if 1 in vc:
+            irpl[column] = vc[1]
+        else:
+            irpl[column] = 0
+    irpl = max(irpl) / [i for i in irpl if i > 0]
     mir = np.average(irpl)
     return irpl, mir
 
