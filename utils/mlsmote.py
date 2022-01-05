@@ -26,6 +26,16 @@ def create_dataset(n_sample=1000):
     return pd.DataFrame(X), y
 
 
+def get_irlb(df):
+    columns = df.columns
+    n = len(columns)
+    irpl = np.zeros(n)
+    for column in range(n):
+        irpl[column] = df[columns[column]].value_counts()[1]
+    irpl = max(irpl) / irpl
+    mir = np.average(irpl)
+    return irpl, mir
+
 def get_tail_label(df):
     """
     Give tail label colums of the given target dataframe
@@ -100,7 +110,7 @@ def nearest_neighbour(X):
     return indices
 
 
-def MLSMOTE(X, y, n_sample):
+def augment(X, y, n_sample=None):
     """
     Give the augmented data using MLSMOTE algorithm
 
@@ -113,6 +123,8 @@ def MLSMOTE(X, y, n_sample):
     new_X: pandas.DataFrame, augmented feature vector data
     target: pandas.DataFrame, augmented target vector data
     """
+    if n_sample is None:
+        n_sample = len(y.columns) * 5
     indices2 = nearest_neighbour(X)
     n = len(indices2)
     new_X = np.zeros((n_sample, X.shape[1]))
@@ -133,6 +145,41 @@ def MLSMOTE(X, y, n_sample):
     target = pd.concat([y, target], axis=0)
     return new_X, target
 
+
+
+def MLSMOTE(X, y):
+    X_sub, y_sub = get_minority_instace(X, y)
+    X_res, y_res = augment(X_sub, y_sub)
+    X_res = pd.concat([X, X_res])
+    y_res = pd.concat([y, y_res])
+    irlb, irlb_mean_last = get_irlb(y_res)
+    print(f"IRMean {irlb_mean_last}")
+    return X_res, y_res
+
+def MLSMOTE_iterative(X, y, threshold=None):
+    X_i = X
+    y_i = y
+    # setting seed for reproducibility purpose
+    random.seed(42)
+    #print(random.getstate())
+    irlb, irlb_mean_last = get_irlb(y_i)
+    print(f"Initial IRMean {irlb_mean_last}")
+    while True:
+        X_sub, y_sub = get_minority_instace(X_i, y_i)
+        X_res, y_res = augment(X_sub, y_sub)
+        X_cur = pd.concat([X, X_res])
+        y_cur = pd.concat([y, y_res])
+        irlb, irlb_mean_cur = get_irlb(y_cur)
+        print(f"Current IRMean {irlb_mean_cur}")
+        if (threshold is None and irlb_mean_cur < irlb_mean_last) \
+                or (threshold is not None and irlb_mean_cur > threshold):
+            X_i = X_cur
+            y_i = y_cur
+            irlb_mean_last = irlb_mean_cur
+        else:
+            print(f"Final IRMean {irlb_mean_last}")
+            break
+    return X_i, y_i
 
 if __name__ == '__main__':
     """

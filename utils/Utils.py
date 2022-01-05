@@ -41,6 +41,30 @@ def load_vectors_from_file(filename, id_col=0, sep='\t', header=None, usecols=No
         return res
 
 
+def bin_vec_to_int(bin_vec):
+    #print(bin_vec)
+    return int("".join([str(i) for i in bin_vec]), 2)
+
+
+def transform_to_powerlabel(y):
+    power_label_to_bin = {}
+    y_res = []
+    for yy in y:
+        #print(yy)
+        powerlabel = bin_vec_to_int(yy)
+        y_res.append(powerlabel)
+        power_label_to_bin[powerlabel] = yy
+    return y_res, power_label_to_bin
+
+
+def transform_to_binary(y_pow, power_label_to_bin):
+    y_res = []
+    for yy in y_pow:
+        y_res.append(power_label_to_bin[yy])
+    return y_res
+
+
+
 def load_matrix_from_file(filename, loadscore=False, exclude_null=False, lowercase=False):
     if (os.path.exists(filename + ".p")):
         return pickle.load(open(filename + ".p", "rb"))
@@ -113,3 +137,24 @@ def get_stopwords(stopwords_file):
 
     pickle.dump([w for w in stop], open(stopwords_file + ".p", "wb"))
     return stop
+
+
+def get_counter(y):
+    counter = {}
+    for yy in y:
+        for yyy in yy:
+            count = 0
+            if yyy in counter:
+                count = counter[yyy]
+            count += 1
+            counter[yyy] = count
+    return counter
+
+
+def print_counter(y, id_to_domain):
+    counter = get_counter(y)
+    for k, v in id_to_domain.items():
+        if v not in counter:
+            print(f"{v}\t0")
+        else:
+            print(f"{v}\t{counter[v]}")

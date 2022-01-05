@@ -1,40 +1,13 @@
-def get_counter(y, mlb=None):
-    counter = {}
-    for yy in y:
-        if mlb is not None:
-            print(yy)
-            print(yy.shape)
-            yy = mlb.inverse_transform(yy)
-        for yyy in yy:
-            count = 0
-            if yyy in counter:
-                count = counter[yyy]
-            count += 1
-            counter[yyy] = count
-    return counter
-
-def print_counter(y, mlb=None):
-    counter = get_counter(y, mlb)
-    for k, v in id_to_domain.items():
-        if v not in counter:
-            print(f"{v}\t0")
-        else:
-            print(f"{v}\t{counter[v]}")
-
-
-
 import os
 from utils.Utils import load_map_from_file, load_list_from_file, load_vectors_from_file
 import bz2
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import TfidfTransformer
-from sklearn.utils import resample
 from sklearn.metrics import classification_report
 import warnings
 warnings.filterwarnings('ignore')  # "error", "ignore", "always", "default", "module" or "once"
 from sklearn.ensemble import RandomForestClassifier
-from utils.Utils import get_stopwords
+from utils.Utils import get_stopwords, print_counter
 import logging
 from sklearn.pipeline import Pipeline
 import pandas as pd
@@ -42,8 +15,6 @@ from sklearn.preprocessing import MultiLabelBinarizer
 import numpy as np
 np.random.seed(0)
 from sklearn.model_selection import cross_val_score
-from sklearn.neural_network import MLPClassifier
-from sklearn.model_selection import StratifiedKFold
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 logging.getLogger("gensim").setLevel(logging.ERROR)
 logging.getLogger("polyglot").setLevel(logging.ERROR)
@@ -55,7 +26,9 @@ logger = logging.getLogger(__name__)
 from sklearn.metrics import multilabel_confusion_matrix
 from preprocessing.Tokenizer import LemmaTokenizer
 from sklearn.neighbors import KNeighborsClassifier, RadiusNeighborsClassifier
-from imblearn.over_sampling import RandomOverSampler
+from utils.mlsmote import get_minority_instace, MLSMOTE, get_irlb, MLSMOTE_iterative
+from sklearn.neural_network import MLPClassifier
+
 
 id_to_domain = "/Users/lgu/workspace/ekr/dome/resources/20211126_input_unified/id2domain.tsv"
 input_folder_corpus = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/Corpus_lov"
@@ -116,9 +89,6 @@ df = pd.DataFrame(data, columns=['Doc Key', 'Doc URI', 'Class Label', 'Text'])
 X = df['Text']
 y = df['Class Label']
 
-# Resampling
-X, y = resample(X, y)
-
 # Preprocessing
 cv = CountVectorizer(lowercase=True, stop_words=stop, tokenizer=LemmaTokenizer(), binary=True)
 pipeline = Pipeline(
@@ -131,12 +101,25 @@ X = pipeline.fit_transform(X)
 mlb = MultiLabelBinarizer()
 y = mlb.fit_transform(y)
 
+## Resampling
+print_counter(mlb.inverse_transform(y), id_to_domain)
+X_df = pd.DataFrame(data=X.todense())
+y_df = pd.DataFrame(data=y, columns=mlb.classes_)
+
+X, y = MLSMOTE_iterative(X_df, y_df)
+
+X = X.values
+y = y.values
+
+print("\n\n RESAMPLING \n\n")
+print_counter(mlb.inverse_transform(y), id_to_domain)
+
 # Test train split
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, test_size=0.1)
 
 classifiers = [
-    #MLPClassifier(solver='lbfgs'),
-    RandomForestClassifier(class_weight="balanced"),
+    MLPClassifier(solver='lbfgs'),
+    #RandomForestClassifier(class_weight="balanced"),
     #KNeighborsClassifier(),
     #RadiusNeighborsClassifier()
 ]
