@@ -62,7 +62,7 @@ def transform_to_binary(y_pow, power_label_to_bin):
 
 
 def load_matrix_from_file(filename, loadscore=False, exclude_null=False, lowercase=False):
-    if (os.path.exists(filename + ".p")):
+    if os.path.exists(filename + ".p"):
         return pickle.load(open(filename + ".p", "rb"))
 
     # print(f"Rows {rows} Cols {cols}")
