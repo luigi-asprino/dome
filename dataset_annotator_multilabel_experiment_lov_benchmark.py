@@ -5,7 +5,6 @@ from scipy.sparse import csr_matrix
 from utils.Utils import load_map_from_file, load_list_from_file, load_vectors_from_file
 from utils.ml_utils import resample
 import bz2
-from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.metrics import classification_report
 import warnings
@@ -18,16 +17,13 @@ import pandas as pd
 from sklearn.preprocessing import MultiLabelBinarizer
 import numpy as np
 np.random.seed(0)
-from sklearn.model_selection import cross_val_score
 from sklearn.neural_network import MLPClassifier
 from preprocessing.Tokenizer import LemmaTokenizer
-from sklearn.neighbors import KNeighborsClassifier, RadiusNeighborsClassifier
+from sklearn.neighbors import KNeighborsClassifier
 import pickle
 from utils.ml_utils import get_irlb
 from sklearn.metrics import hamming_loss, accuracy_score, f1_score
 from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
-
-
 
 # Logging configuration
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
@@ -114,7 +110,7 @@ resampling_strategy = "mlsmote_iterative"
 use_hierarchy = False
 use_tfidf = False
 
-folder = "/Users/lgu/Desktop/NOTime/EKR/experiments/lov_benchmark_no_hierarchy/"
+folder = "/Users/lgu/Desktop/NOTime/EKR/experiments/lov_benchmark_no_hierarchy_stratified/"
 data_file = folder + "data_file.p"
 
 if not os.path.exists(folder):
@@ -220,7 +216,7 @@ for clf in classifiers:
     #scoring = "f1_weighted"
     mskf = MultilabelStratifiedKFold(n_splits=10, shuffle=True, random_state=42)
     f = open(estimator_folder + '/results.txt', 'w')
-    computed_metrics = {"hls": [], "accs": [], "f1_score": [], "f1_micro": [], "f1_macro": [], "f1_weight": []}
+    computed_metrics = {"hls": [], "accs": [],  "f1_micro": [], "f1_macro": [], "f1_weight": []}
     for train_index, test_index in mskf.split(X, y):
 
         X_train, X_test = X[train_index], X[test_index]
@@ -239,9 +235,6 @@ for clf in classifiers:
         acc = accuracy_score(y_test, y_test_pred)
         computed_metrics["accs"].append(acc)
 
-        f1 = f1_score(y_test, y_test_pred)
-        computed_metrics["f1_score"].append(f1)
-
         f1_micro = f1_score(y_test, y_test_pred, average="micro")
         computed_metrics["f1_micro"].append(f1_micro)
 
@@ -251,7 +244,7 @@ for clf in classifiers:
         f1_weight = f1_score(y_test, y_test_pred, average="weighted")
         computed_metrics["f1_weight"].append(f1_weight)
 
-        to_print = f"Hamming loss {hl} Accuracy {acc} F1 score {f1} micro {f1_micro} macro {f1_macro} weight {f1_weight}"
+        to_print = f"Hamming loss {hl} Accuracy {acc} F1: micro {f1_micro} macro {f1_macro} weight {f1_weight}"
 
         f.write(to_print)
         print(to_print)
