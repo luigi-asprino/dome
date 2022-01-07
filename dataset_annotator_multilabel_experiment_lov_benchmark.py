@@ -2,8 +2,10 @@ import os
 
 from scipy.sparse import csr_matrix
 
+from domainannotators.DocumentDomainAnnotators import SimpleDocumentAnnotator, DocumentAnnotatorAggregationStrategy
+from domainannotators.WordAnnotators import RocksDBDomainDisambiguator, AggregationStrategy
 from utils.Utils import load_map_from_file, load_list_from_file, load_vectors_from_file
-from utils.ml_utils import resample
+from utils.ml_utils import resample, DomainTransformer
 import bz2
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.metrics import classification_report
@@ -108,18 +110,26 @@ uri_to_doc_id_file_benchmark = "/Users/lgu/Desktop/NOTime/EKR/Benchmark/virtual_
 
 resampling_strategy = "mlsmote_iterative"
 use_hierarchy = False
-use_tfidf = False
+use_tfidf = True
+use_domain_annotator = True
 
-folder = "/Users/lgu/Desktop/NOTime/EKR/experiments/lov_benchmark_no_hierarchy_stratified/"
+folder = "/Users/lgu/Desktop/NOTime/EKR/experiments/lov_benchmark_tf_da/"
 data_file = folder + "data_file.p"
 
 if not os.path.exists(folder):
     os.mkdir(folder)
 
+fc = open(folder + '/configuration.txt', 'w')
+fc.write(f"Resampling strategy {resampling_strategy}\n")
+fc.write(f"Use hierarchy in training/testing phase {use_hierarchy}\n")
+fc.write(f"Use hierarchy TF-IDF {use_tfidf}\n")
+fc.write(f"Use domain annotator {use_domain_annotator}\n")
+
+# Load resources
+id_to_domain = load_map_from_file(id_to_domain)
+domain_to_id = {k: v for v, k in id_to_domain.items()}
+
 if not os.path.exists(data_file):
-    # Load resources
-    id_to_domain = load_map_from_file(id_to_domain)
-    domain_to_id = {k: v for v, k in id_to_domain.items()}
 
     doc_ids = load_list_from_file(input_folder_corpus + "/doc_ids", token_number, extractid=True)
     id2doc = {k: v for v, k in enumerate(doc_ids)}
@@ -147,6 +157,21 @@ else:
     print("Loading data file")
     df = pickle.load(open(data_file, "rb"))
 
+lemma_to_domain_dbs = ["/Users/lgu/workspace/ekr/dome/resources/20211126_input_unified/lemma_to_domain_wn",
+                        "wn",
+                        "/Users/lgu/workspace/ekr/dome/resources/20211126_input_unified/lemma_to_domain_bn",
+                        "bn"]
+lemma_dbs = []
+i = 0
+while i < len(lemma_to_domain_dbs):
+    print(f"Loading DB from path {lemma_to_domain_dbs[i]} {lemma_to_domain_dbs[i + 1]}")
+    db = RocksDBDomainDisambiguator(lemma_to_domain_dbs[i], lemma_to_domain_dbs[i + 1], id_to_domain,
+                                        hierarchy={}, strategy=AggregationStrategy.MAX)
+    lemma_dbs.append(db)
+    i = i + 2
+da = SimpleDocumentAnnotator(None, id_to_domain, lemma_dbs, [],
+    strategy=DocumentAnnotatorAggregationStrategy.SUM_WORD_MAX)
+
 if not os.path.exists(folder+resampling_strategy):
     os.mkdir(folder+resampling_strategy)
     X = df['Text']
@@ -154,12 +179,15 @@ if not os.path.exists(folder+resampling_strategy):
 
     stop = get_stopwords("stopwords.txt")
 
-    cv = CountVectorizer(lowercase=True, stop_words=stop, tokenizer=LemmaTokenizer(), binary=True)
+    cv = CountVectorizer(lowercase=True, stop_words=stop, tokenizer=LemmaTokenizer(), binary=not use_tfidf)
 
     transformers_pipeline = [("vect", cv)]
 
     if use_tfidf:
         transformers_pipeline.append(("tfidf", TfidfTransformer()))
+
+    if use_domain_annotator:
+        transformers_pipeline.append(("da", DomainTransformer(da, cv)))
 
     pipeline = Pipeline(transformers_pipeline)
 
@@ -183,7 +211,8 @@ if not os.path.exists(folder+resampling_strategy):
     pickle.dump(X, open(folder+resampling_strategy+"/X.p", "wb"))
     pickle.dump(y, open(folder + resampling_strategy + "/y.p", "wb"))
     pickle.dump(mlb, open(folder + resampling_strategy + "/mlb.p", "wb"))
-    pickle.dump(pipeline, open(folder + resampling_strategy + "/pipeline.p", "wb"))
+    if not use_domain_annotator:
+        pickle.dump(pipeline, open(folder + resampling_strategy + "/pipeline.p", "wb"))
     pickle.dump(cv, open(folder + resampling_strategy + "/cv.p", "wb"))
 else:
     print("Loading X and y")
@@ -227,6 +256,7 @@ for clf in classifiers:
 
         to_print = classification_report(y_test, y_test_pred)
         f.write(to_print)
+        print(estimator)
         print(to_print)
 
         hl = hamming_loss(y_test, y_test_pred)
@@ -244,7 +274,7 @@ for clf in classifiers:
         f1_weight = f1_score(y_test, y_test_pred, average="weighted")
         computed_metrics["f1_weight"].append(f1_weight)
 
-        to_print = f"Hamming loss {hl} Accuracy {acc} F1: micro {f1_micro} macro {f1_macro} weight {f1_weight}"
+        to_print = f"Hamming loss {hl} Accuracy {acc} F1: micro {f1_micro} macro {f1_macro} weight {f1_weight}\n"
 
         f.write(to_print)
         print(to_print)
@@ -253,7 +283,7 @@ for clf in classifiers:
     for metric_name, observations in computed_metrics.items():
         mean = np.array(observations).mean()
         std = np.array(observations).std()
-        to_print = f"{metric_name} mean {mean} std {std}"
+        to_print = f"{metric_name} mean {mean} std {std}\n"
         f.write(to_print)
         print(to_print)
 

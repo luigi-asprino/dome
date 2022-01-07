@@ -33,7 +33,7 @@ def doc_to_csr_matrix(doc, dic_id_to_feature_id, features, binary=True):
 token_number = 8
 laundromat_corpus = "/Users/lgu/Desktop/NOTime/EKR/Corpus_lod_4"
 # laundromat_corpus = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/Corpus_lov"
-corpus_resampled_folder = "/Users/lgu/Desktop/NOTime/EKR/experiment_lov_benchmark/mlsmote_iterative"
+corpus_resampled_folder = "/Users/lgu/Desktop/NOTime/EKR/experiments/lov_benchmark_no_hierarchy_stratified/mlsmote_iterative"
 classifier_folder = corpus_resampled_folder + "/MLPClassifier"
 
 tfidf_corpus_file = laundromat_corpus + "/tfidf_corpus"
