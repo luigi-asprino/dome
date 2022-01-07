@@ -20,12 +20,13 @@ import numpy as np
 np.random.seed(0)
 from sklearn.model_selection import cross_val_score
 from sklearn.neural_network import MLPClassifier
-from sklearn.metrics import multilabel_confusion_matrix
 from preprocessing.Tokenizer import LemmaTokenizer
 from sklearn.neighbors import KNeighborsClassifier, RadiusNeighborsClassifier
 import pickle
 from utils.ml_utils import get_irlb
-from sklearn.metrics import hamming_loss, accuracy_score
+from sklearn.metrics import hamming_loss, accuracy_score, f1_score
+from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
+
 
 
 # Logging configuration
@@ -194,7 +195,7 @@ else:
     y = pickle.load(open(folder+resampling_strategy+"/y.p", "rb"))
 
 # Test train split
-X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, test_size=0.1)
+#X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, test_size=0.1)
 
 classifiers = [
     RandomForestClassifier(class_weight="balanced"),
@@ -216,32 +217,79 @@ for clf in classifiers:
         print(f"Skipping {estimator}")
         continue
 
-    scoring = "f1_weighted"
-    scores = cross_val_score(clf, X, y, cv=10, scoring=scoring)
+    #scoring = "f1_weighted"
+    mskf = MultilabelStratifiedKFold(n_splits=10, shuffle=True, random_state=42)
+    f = open(estimator_folder + '/results.txt', 'w')
+    computed_metrics = {"hls": [], "accs": [], "f1_score": [], "f1_micro": [], "f1_macro": [], "f1_weight": []}
+    for train_index, test_index in mskf.split(X, y):
 
-    clf.fit(X_train, y_train)
+        X_train, X_test = X[train_index], X[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+
+        clf.fit(X_train, y_train)
+        y_test_pred = clf.predict(X_test)
+
+        to_print = classification_report(y_test, y_test_pred)
+        f.write(to_print)
+        print(to_print)
+
+        hl = hamming_loss(y_test, y_test_pred)
+        computed_metrics["hls"].append(hl)
+
+        acc = accuracy_score(y_test, y_test_pred)
+        computed_metrics["accs"].append(acc)
+
+        f1 = f1_score(y_test, y_test_pred)
+        computed_metrics["f1_score"].append(f1)
+
+        f1_micro = f1_score(y_test, y_test_pred, average="micro")
+        computed_metrics["f1_micro"].append(f1_micro)
+
+        f1_macro = f1_score(y_test, y_test_pred, average="macro")
+        computed_metrics["f1_macro"].append(f1_macro)
+
+        f1_weight = f1_score(y_test, y_test_pred, average="weighted")
+        computed_metrics["f1_weight"].append(f1_weight)
+
+        to_print = f"Hamming loss {hl} Accuracy {acc} F1 score {f1} micro {f1_micro} macro {f1_macro} weight {f1_weight}"
+
+        f.write(to_print)
+        print(to_print)
+
+    ## Print mean and std
+    for metric_name, observations in computed_metrics.items():
+        mean = np.array(observations).mean()
+        std = np.array(observations).std()
+        to_print = f"{metric_name} mean {mean} std {std}"
+        f.write(to_print)
+        print(to_print)
+
+
+    #scores = cross_val_score(clf, X, y, cv=10, scoring=scoring)
+
+    #clf.fit(X_train, y_train)
 
     # Get predictions for test data
-    y_test_pred = clf.predict(X_test)
+    #y_test_pred = clf.predict(X_test)
 
     # Generate multilabel confusion matrices
     #matrices = multilabel_confusion_matrix(y_test, y_test_pred)
 
-    f = open(estimator_folder + '/results.txt', 'w')
+    #f = open(estimator_folder + '/results.txt', 'w')
 
-    to_print = classification_report(y_test, y_test_pred)
-    f.write(to_print)
-    print(to_print)
+    #to_print = classification_report(y_test, y_test_pred)
+    #f.write(to_print)
+    #print(to_print)
 
-    hl = hamming_loss(y_test, y_test_pred)
-    acc = accuracy_score(y_test, y_test_pred)
-    to_print = f"Hamming loss {hl} Accuracy {acc}"
-    f.write(to_print)
-    print(to_print)
+    #hl = hamming_loss(y_test, y_test_pred)
+    #acc = accuracy_score(y_test, y_test_pred)
+    #to_print = f"Hamming loss {hl} Accuracy {acc}"
+    #f.write(to_print)
+    #print(to_print)
 
-    to_print = f"{estimator} {scores.mean()} {scoring} with a standard deviation of {scores.std()}\n"
-    f.write(to_print)
-    print(to_print)
+    #to_print = f"{estimator} {scores.mean()} {scoring} with a standard deviation of {scores.std()}\n"
+    #f.write(to_print)
+    #print(to_print)
 
     clf.fit(X, y)
     pickle.dump(clf, open(estimator_folder + "/clf.p", "wb"))
