@@ -24,6 +24,7 @@ from sklearn.metrics import multilabel_confusion_matrix
 from preprocessing.Tokenizer import LemmaTokenizer
 from sklearn.neighbors import KNeighborsClassifier, RadiusNeighborsClassifier
 import pickle
+from utils.ml_utils import get_irlb
 
 # Logging configuration
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
@@ -106,7 +107,7 @@ resampling_strategy = "mlsmote_iterative"
 virtual_documents_lov = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/output"
 virtual_documents_benchmark = "/Users/lgu/Desktop/NOTime/EKR/Benchmark/virtual_documents"
 uri_to_doc_id_file_benchmark = "/Users/lgu/Desktop/NOTime/EKR/Benchmark/virtual_documents/index.tsv"
-folder = "/Users/lgu/Desktop/NOTime/EKR/partial/"
+folder = "/Users/lgu/Desktop/NOTime/EKR/experiment_lov_benchmark/"
 data_file = folder + "data_file.p"
 
 if not os.path.exists(folder):
@@ -166,12 +167,20 @@ if not os.path.exists(folder+resampling_strategy):
     # Resampling
     X, y = resample(X, y, stategy=resampling_strategy)
 
+    irlb, irlb_mean_last = get_irlb(y)
+    mess = f"IRLB mean {irlb_mean_last}"
+    f = open(folder+resampling_strategy+"/irlb_mean.txt", 'w')
+    f.write(mess)
+
     y = y.values
     X = csr_matrix(X.values)
 
     print("Dumping X and y")
     pickle.dump(X, open(folder+resampling_strategy+"/X.p", "wb"))
     pickle.dump(y, open(folder + resampling_strategy + "/y.p", "wb"))
+    pickle.dump(mlb, open(folder + resampling_strategy + "/mlb.p", "wb"))
+    pickle.dump(pipeline, open(folder + resampling_strategy + "/pipeline.p", "wb"))
+    pickle.dump(cv, open(folder + resampling_strategy + "/cv.p", "wb"))
 else:
     print("Loading X and y")
     X = pickle.load(open(folder+resampling_strategy+"/X.p", "rb"))
@@ -181,10 +190,9 @@ else:
 X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, test_size=0.1)
 
 classifiers = [
-    MLPClassifier(solver='lbfgs'),
-    #RandomForestClassifier(class_weight="balanced"),
-    #KNeighborsClassifier(),
-    #RadiusNeighborsClassifier()
+    RandomForestClassifier(class_weight="balanced"),
+    KNeighborsClassifier(),
+    MLPClassifier(solver='lbfgs')
 ]
 
 for clf in classifiers:
@@ -197,6 +205,9 @@ for clf in classifiers:
 
     if not os.path.exists(estimator_folder):
         os.mkdir(estimator_folder)
+    else:
+        print(f"Skipping {estimator}")
+        continue
 
     scoring = "f1_weighted"
     scores = cross_val_score(clf, X, y, cv=10, scoring=scoring)
@@ -220,10 +231,4 @@ for clf in classifiers:
     print(to_print)
 
     clf.fit(X, y)
-    pickle.dump(clf, open(estimator_folder + resampling_strategy + "/clf.p", "wb"))
-
-
-
-
-
-
+    pickle.dump(clf, open(estimator_folder + "/clf.p", "wb"))
