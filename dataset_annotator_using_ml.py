@@ -32,7 +32,7 @@ from domainannotators.WordAnnotators import RocksDBDomainDisambiguator, Aggregat
 from domainannotators.DocumentDomainAnnotators import SimpleDocumentAnnotator, DocumentAnnotatorAggregationStrategy
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.pipeline import Pipeline
-import scipy.sparse  as sp
+import scipy.sparse as sp
 import pandas as pd
 
 import numpy as np
@@ -282,7 +282,7 @@ pipeline = Pipeline(
     [
         ("vect", cv),
         ("tfidf", tfidf),
-#        ("da", DomainTransformer(da, cv))
+        ("da", DomainTransformer(da, cv))
     ]
 )
 

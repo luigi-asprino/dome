@@ -6,7 +6,7 @@ from utils.Utils import load_map_from_file, load_list_from_file, load_vectors_fr
 from utils.ml_utils import resample
 import bz2
 from sklearn.model_selection import train_test_split
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.metrics import classification_report
 import warnings
 warnings.filterwarnings('ignore')  # "error", "ignore", "always", "default", "module" or "once"
@@ -25,6 +25,8 @@ from preprocessing.Tokenizer import LemmaTokenizer
 from sklearn.neighbors import KNeighborsClassifier, RadiusNeighborsClassifier
 import pickle
 from utils.ml_utils import get_irlb
+from sklearn.metrics import hamming_loss, accuracy_score
+
 
 # Logging configuration
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
@@ -103,11 +105,15 @@ uri_to_doc_id_file = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/output/index.
 gold_standard = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/LOV_KD_annotations.tsv"
 gold_standard_benchmark = "/Users/lgu/Desktop/NOTime/EKR/Benchmark/GoldStandart-MultiTopic.tsv"
 hierarchy_file = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/KD_hierarchy.tsv"
-resampling_strategy = "mlsmote_iterative"
 virtual_documents_lov = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/output"
 virtual_documents_benchmark = "/Users/lgu/Desktop/NOTime/EKR/Benchmark/virtual_documents"
 uri_to_doc_id_file_benchmark = "/Users/lgu/Desktop/NOTime/EKR/Benchmark/virtual_documents/index.tsv"
-folder = "/Users/lgu/Desktop/NOTime/EKR/experiment_lov_benchmark/"
+
+resampling_strategy = "mlsmote_iterative"
+use_hierarchy = False
+use_tfidf = False
+
+folder = "/Users/lgu/Desktop/NOTime/EKR/experiments/lov_benchmark_no_hierarchy/"
 data_file = folder + "data_file.p"
 
 if not os.path.exists(folder):
@@ -129,11 +135,10 @@ if not os.path.exists(data_file):
 
     uri_to_gold_classes = load_vectors_from_file(gold_standard,  usecols=[0,1,2,3], nullstring="-")
 
-
-
     hierarchy = {}
-    for (k, v) in load_map_from_file(hierarchy_file).items():
-        hierarchy[int(k)] = [int(kd.strip()) for kd in v.split(",")]
+    if use_hierarchy:
+        for (k, v) in load_map_from_file(hierarchy_file).items():
+            hierarchy[int(k)] = [int(kd.strip()) for kd in v.split(",")]
 
     data_lov = load_dataset(virtual_documents_lov, doc_id_to_uri, uri_to_gold_classes, hierarchy)
     uri_to_gold_classes_benchmark, headers_benchmark = load_vectors_from_file(gold_standard_benchmark, header=0, usecols=[0,1,2,3,4,5,6])
@@ -153,12 +158,14 @@ if not os.path.exists(folder+resampling_strategy):
     stop = get_stopwords("stopwords.txt")
 
     cv = CountVectorizer(lowercase=True, stop_words=stop, tokenizer=LemmaTokenizer(), binary=True)
-    pipeline = Pipeline(
-        [
-            ("vect", cv),
-            # ("tfidf", TfidfTransformer()),
-        ]
-    )
+
+    transformers_pipeline = [("vect", cv)]
+
+    if use_tfidf:
+        transformers_pipeline.append(("tfidf", TfidfTransformer()))
+
+    pipeline = Pipeline(transformers_pipeline)
+
     # Preprocessing
     X = pd.DataFrame(pipeline.fit_transform(X).todense())
     mlb = MultiLabelBinarizer()
@@ -217,12 +224,18 @@ for clf in classifiers:
     # Get predictions for test data
     y_test_pred = clf.predict(X_test)
 
-    # Generate multiclass confusion matrices
-    matrices = multilabel_confusion_matrix(y_test, y_test_pred)
+    # Generate multilabel confusion matrices
+    #matrices = multilabel_confusion_matrix(y_test, y_test_pred)
 
     f = open(estimator_folder + '/results.txt', 'w')
 
     to_print = classification_report(y_test, y_test_pred)
+    f.write(to_print)
+    print(to_print)
+
+    hl = hamming_loss(y_test, y_test_pred)
+    acc = accuracy_score(y_test, y_test_pred)
+    to_print = f"Hamming loss {hl} Accuracy {acc}"
     f.write(to_print)
     print(to_print)
 
