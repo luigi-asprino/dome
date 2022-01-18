@@ -65,13 +65,8 @@ class DomainTransformer(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X, y=None):
-        #print("Transform called")
-        #print(type(X))
-        #print(X.shape)
         d = np.zeros((X.shape[0], len(self.da.id_to_domain)))
-        #print(f"Number of documents {X.shape[0]}")
-        for row in range(0,X.shape[0]):
+        for row in range(0, X.shape[0]):
             doc_words_all = {self.words[col]: X[row, col] for col in X[row, :].nonzero()[1]}
             d[row] = self.da.get_domain_vector(doc_words_all)[0]
-
-        return sp.hstack([X,d])
+        return sp.hstack([X, d])

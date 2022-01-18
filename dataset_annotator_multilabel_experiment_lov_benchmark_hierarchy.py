@@ -1,6 +1,9 @@
 import os
 
 from scipy.sparse import csr_matrix
+from sklearn.decomposition import TruncatedSVD
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn_hierarchical_classification.classifier import HierarchicalClassifier
 
 from domainannotators.DocumentDomainAnnotators import SimpleDocumentAnnotator, DocumentAnnotatorAggregationStrategy
 from domainannotators.WordAnnotators import RocksDBDomainDisambiguator, AggregationStrategy
@@ -26,6 +29,11 @@ import pickle
 from utils.ml_utils import get_irlb
 from sklearn.metrics import hamming_loss, accuracy_score, f1_score
 from iterstrat.ml_stratifiers import MultilabelStratifiedKFold
+from sklearn_hierarchical_classification.constants import ROOT
+import shutil
+from hiclass import LocalClassifierPerNode
+
+
 
 # Logging configuration
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
@@ -108,17 +116,66 @@ virtual_documents_lov = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/output"
 virtual_documents_benchmark = "/Users/lgu/Desktop/NOTime/EKR/Benchmark/virtual_documents"
 uri_to_doc_id_file_benchmark = "/Users/lgu/Desktop/NOTime/EKR/Benchmark/virtual_documents/index.tsv"
 
+class_hierarchy = {
+        ROOT: ["Sport, Recreation", "Social Science", "History", "Linguistics", "Pure Science", "Life Science",
+               "Astrology", "Applied Science", "Literature", "Engineering, Technology", "Time",
+               "Art, architecture, and archaeology", "Religion", "Phylosophy, Psychology", "Bibliography",
+               "Scientific Research & Academy"],
+        "Sport, Recreation": ["Sport", "Recreation"],
+        "Social Science": ["Political Science", "Sexuality", "Sociology", "Military", "Pedagogy", "Transport, Travel",
+                           "Telecommunication(telegraphy, telephony, networking)", "Law", "Industry", "Fashion",
+                           "Mediology(tv, radio, newspapers)", "Economy", "Anthropology"],
+        "Pure Science": ["Physics, Astronomy", "Mathematics", "Chemistry", "Earth", "Biology"],
+        "Life Science": ["Biology", "Medicine"],
+        "Applied Science": ["Medicine", "Alimentation", "Computer Science", "Agriculture", "Architecture",
+                            "Engineering"],
+        "Engineering, Technology": ["Engineering", "Technology"],
+        "Art, architecture, and archaeology": ["Architecture", "Archaeology", "Art & Culture"],
+        "Phylosophy, Psychology": ["Psychology", "Philosophy"],
+        "Sociology" : ["Social Networking"],
+        "Military": ["Naval Science"],
+        "Transport, Travel": ["Transport", "Tourism"],
+        "Anthropology": ["Royalty and nobility"],
+        "Physics, Astronomy": ["Physics", "Astronomy"],
+        "Earth": ["Geography", "Geology", "Meteorology", "Oceanography", "Paleontology"],
+        "Art & Culture": ["Drawing", "Music", "Plastic Arts", "Photography", "Theatre", "Dance"]
+    }
+all_classes = set([v for k, vs in class_hierarchy.items() for v in vs])
+all_classes.update([k for k, v in class_hierarchy.items()])
+
 resampling_strategy = "mlsmote_iterative"
 use_hierarchy = False
-use_tfidf = True
-use_domain_annotator = True
+use_tfidf = False
+use_domain_annotator = False
 on_LOV = True
 on_Bench = True
+flash = False
+only_top_level = True
 
-folder = "/Users/lgu/Desktop/NOTime/EKR/experiments/lov_bench_tf_da/"
+folder = "/Users/lgu/Desktop/NOTime/EKR/experiments/"
+
+if on_LOV:
+    folder += "lov_"
+if on_Bench:
+    folder += "bench_"
+if use_hierarchy:
+    folder += "hp_"
+if use_tfidf:
+    folder += "tf_"
+else:
+    folder += "bin_"
+if use_domain_annotator:
+    folder += "da_"
+if only_top_level:
+    folder += "top_"
+folder = folder[:-1] + "/"
+
 data_file = folder + "data_file.p"
 
 if not os.path.exists(folder):
+    os.mkdir(folder)
+elif flash:
+    shutil.rmtree(folder)
     os.mkdir(folder)
 
 fc = open(folder + '/configuration.txt', 'w')
@@ -128,11 +185,18 @@ fc.write(f"Use hierarchy TF-IDF {use_tfidf}\n")
 fc.write(f"Use domain annotator {use_domain_annotator}\n")
 fc.write(f"On LOV {on_LOV}\n")
 fc.write(f"On Benchmark {on_Bench}\n")
+fc.write(f"Only Top-Level {only_top_level}\n")
 
 # Load resources
 id_to_domain = load_map_from_file(id_to_domain)
 domain_to_id = {k: v for v, k in id_to_domain.items()}
 
+## Check classes
+for domain in all_classes:
+    if domain not in domain_to_id:
+        print(f"Wrong domain {domain}")
+
+tod_domains_ids = [domain_to_id[d] for d in class_hierarchy[ROOT]]
 
 if not os.path.exists(data_file):
 
@@ -154,22 +218,45 @@ if not os.path.exists(data_file):
     if use_hierarchy:
         data_lov = load_dataset(virtual_documents_lov, doc_id_to_uri, uri_to_gold_classes, hierarchy)
     else:
-        data_lov = load_dataset(virtual_documents_lov, doc_id_to_uri, uri_to_gold_classes, {})
+        data_lov = load_dataset(virtual_documents_lov, doc_id_to_uri, uri_to_gold_classes, None)
 
     uri_to_gold_classes_benchmark, headers_benchmark = load_vectors_from_file(gold_standard_benchmark, header=0, usecols=[0,1,2,3,4,5,6])
     data_benchmark = load_benchmark(virtual_documents_benchmark, doc_id_to_uri_benchmark, uri_to_gold_classes_benchmark, headers_benchmark, hierarchy)
-
+    
     data = []
     if on_LOV:
         data = data + data_lov
     if on_Bench:
         data = data + data_benchmark
 
+    if only_top_level:
+        data_new = []
+        for klasses, txt in data:
+            klasses_new = []
+            for klass_label in klasses:
+                #top_classes = [id_to_domain[klass_id] for klass_id in domain_to_id[klass_label] for super_ if klass_id in tod_domains_ids]
+                top_classes = []
+                if domain_to_id[klass_label] in tod_domains_ids:
+                    if klass_label not in klasses_new:
+                        top_classes.append(klass_label)
+                elif domain_to_id[klass_label] in hierarchy:
+                    for super_klass_id in hierarchy[domain_to_id[klass_label]]:
+                        if super_klass_id in tod_domains_ids:
+                            if id_to_domain[super_klass_id] not in klasses_new:
+                                top_classes.append(id_to_domain[super_klass_id])
+                klasses_new.extend(top_classes)
+            data_new.append([klasses_new, txt])
+            #print(f"{klasses} -> {klasses_new}")
+
+        data = data_new
+
     df = pd.DataFrame(data, columns=['Class Label', 'Text'])
     pickle.dump(df, open(data_file, "wb"))
 else:
     print("Loading data file")
     df = pickle.load(open(data_file, "rb"))
+
+print(df)
 
 lemma_to_domain_dbs = ["/Users/lgu/workspace/ekr/dome/resources/20211126_input_unified/lemma_to_domain_wn",
                         "wn",
@@ -232,14 +319,19 @@ else:
     print("Loading X and y")
     X = pickle.load(open(folder+resampling_strategy+"/X.p", "rb"))
     y = pickle.load(open(folder+resampling_strategy+"/y.p", "rb"))
+    mlb = pickle.load(open(folder + resampling_strategy + "/mlb.p", "rb"))
 
 # Test train split
-#X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0, test_size=0.1)
-
 classifiers = [
     RandomForestClassifier(class_weight="balanced"),
     KNeighborsClassifier(),
-    MLPClassifier(solver='lbfgs')
+    MLPClassifier(solver='lbfgs'),
+    # HierarchicalClassifier(
+    #     base_estimator=MLPClassifier(solver='lbfgs'),
+    #     class_hierarchy=class_hierarchy,
+    #     mlb=mlb,
+    #     use_decision_function=True
+    # )
 ]
 
 for clf in classifiers:
