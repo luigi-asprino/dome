@@ -30,7 +30,12 @@ def resample_powerlabel(X, y):
     y_res = pd.DataFrame(transform_to_binary(y_powerlabel_res.values, powerlabel_to_bin))
     return X_res, y_res
 
-def resample(X, y, stategy=None):
+class Strategies:
+    MLSMOTE = "mlsmote"
+    MLSMOTE_IT = "mlsmote_iterative"
+    DEFAULT = "default"
+
+def resample(X, y, stategy=None, n_sample=None):
     irlb, irlb_mean_last = get_irlb(y)
     print(f"IRMean before resampling {irlb_mean_last} number of examples {len(X)} number of target {len(y)}")
     print(f"strategy {stategy}")
@@ -42,15 +47,52 @@ def resample(X, y, stategy=None):
         X_res, y_res = resample_powerlabel_ros(X, y)
     elif stategy == "powerlabel_smoteen":
         X_res, y_res = resample_powerlabel_smoteen(X, y)
-    elif stategy == "mlsmote_iterative":
+    elif stategy == Strategies.MLSMOTE_IT:
         X_res, y_res = MLSMOTE_iterative(X, y)
-    elif stategy == "mlsmote":
-        X_res, y_res = MLSMOTE(X, y)
-    else:
+    elif stategy == Strategies.MLSMOTE:
+        X_res, y_res = MLSMOTE(X, y, n_sample)
+    elif stategy == Strategies.DEFAULT:
         X_res, y_res = utils.resample(X, y)
     irlb, irlb_mean_last = get_irlb(y_res)
     print(f"IRMean after resampling {irlb_mean_last} number of examples {len(X_res)} number of target {len(y_res)}")
     return X_res, y_res
+
+
+def get_class_distribution(y):
+    counter = {}
+    for i in y:
+        k = " ".join(i)
+        if k in counter:
+            counter[k] = counter[k] + 1
+        else:
+            counter[k] = 1
+    return counter
+
+
+def write_class_distribution_on_file(y, filepath):
+    counter = get_class_distribution(y[0])
+    fcounter = open(filepath, 'w')
+    counter_ordered = sorted(counter.items(), key=lambda item: item[1], reverse=True)
+    for k, v in counter_ordered:
+        fcounter.write(f"{k}\t{v}\n")
+    fcounter.flush()
+    fcounter.close()
+    return counter, counter_ordered
+
+
+def specialize_annotations(y, hierarchy, domain_to_id):
+    for i in y:
+        to_exclude_from_i = set([])
+        for ii in i:
+            for jj in i:
+                if domain_to_id[ii] in hierarchy and domain_to_id[jj] in hierarchy[domain_to_id[ii]]: # jj is superclass of ii
+                    to_exclude_from_i.add(jj)
+        for r in to_exclude_from_i:
+            i.remove(r)
+
+
+def get_indexes_of_items_with_labels(y, label):
+    return [idx for idx, ann in enumerate(y) if ann == label]
 
 
 class DomainTransformer(BaseEstimator, TransformerMixin):

@@ -12,8 +12,8 @@ class CorpusFiltered:
         for doc in self.input_corpus:
             yield [e for e in doc if e[0] in self.dictionary]
 
-#laundromat_corpus = "/Users/lgu/Dropbox/Backups/Corpus_lod"
-laundromat_corpus = "/media/hd1000/Corpus_Lod"
+laundromat_corpus = "/Users/lgu/Dropbox/Backups/Corpus_lod"
+#laundromat_corpus = "/media/hd1000/Corpus_Lod"
 tfidf_corpus_file = laundromat_corpus + "/tfidf_corpus"
 dictionary_file = laundromat_corpus + "/dictionary"
 corpus_tfidf = corpora.MmCorpus(tfidf_corpus_file)
@@ -34,6 +34,7 @@ corpus_lda = lda[corpus_tfidf_filtered]
 print("Corpus LDA computed")
 corpora.MmCorpus.serialize(laundromat_corpus+"/corpus_lda_100k", corpus_lda)
 print("Corpus LDA saved")
+corpus_lda = corpora.MmCorpus(laundromat_corpus+"/corpus_lda_100k")
 
 from utils.Utils import load_list_from_file
 token_number = 8

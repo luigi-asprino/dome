@@ -4,11 +4,13 @@ import os
 import pycountry
 from stop_words import get_stop_words, AVAILABLE_LANGUAGES
 import logging
+import numpy as np
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def load_list_from_file(filename, token_number=0, extractid=False):
-    if (os.path.exists(filename + ".p")):
+
+def load_list_from_file(filename, token_number=0, extractid=False, flash=False):
+    if os.path.exists(filename + ".p") and not flash:
         return pickle.load(open(filename + ".p", "rb"))
     df = pd.read_csv(filename, sep='\t', header=None, usecols=[0])
     if extractid:
@@ -19,11 +21,16 @@ def load_list_from_file(filename, token_number=0, extractid=False):
     return result
 
 
-def load_map_from_file(filename):
+def load_map_from_file(filename, usecols=[0,1], keycol=0, valuecol=[1], skiprows=[]):
     if os.path.exists(filename + ".p"):
         return pickle.load(open(filename + ".p", "rb"))
-    df = pd.read_csv(filename, sep='\t', header=None, usecols=[0, 1])
-    res = {row[0]: row[1] for index, row in df.iterrows()}
+    df = pd.read_csv(filename, sep='\t', header=None, usecols=usecols, skiprows=skiprows)
+    #print(exclude)
+    #print(df)
+    if len(valuecol) == 1:
+        res = {row[keycol]: row[valuecol[0]] for index, row in df.iterrows()}
+    else:
+        res = {row[keycol]: [row[i] for i in valuecol if  pd.notna(row[i])] for index, row in df.iterrows()}
     pickle.dump(res, open(filename + ".p", "wb"))
     return res
 

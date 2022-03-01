@@ -151,13 +151,14 @@ def augment(X, y, n_sample=None):
 
 
 
-def MLSMOTE(X, y):
+def MLSMOTE(X, y, n_sample=None):
+    print(f"IRMean {get_irlb(y)[1]} {len(X)} {len(y)}")
     X_sub, y_sub = get_minority_instace(X, y)
-    X_res, y_res = augment(X_sub, y_sub)
+    X_res, y_res = augment(X_sub, y_sub, n_sample)
     X_res = pd.concat([X, X_res])
     y_res = pd.concat([y, y_res])
     irlb, irlb_mean_last = get_irlb(y_res)
-    print(f"IRMean {irlb_mean_last}")
+    print(f"IRMean {irlb_mean_last} {len(X_res)} {len(y_res)}")
     return X_res, y_res
 
 def MLSMOTE_iterative(X, y, threshold=None):
@@ -192,5 +193,5 @@ if __name__ == '__main__':
     X, y = create_dataset()  # Creating a Dataframe
     print(X)
     print(y)
-    X_sub, y_sub = get_minority_instace(X, y)  # Getting minority instance of that datframe
-    X_res, y_res = MLSMOTE(X_sub, y_sub, 100)  # Applying MLSMOTE to augment the dataframe
+    #X_sub, y_sub = get_minority_instace(X, y)  # Getting minority instance of that datframe
+    X_res, y_res = MLSMOTE(X, y, 100)  # Applying MLSMOTE to augment the dataframe

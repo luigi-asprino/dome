@@ -1,13 +1,11 @@
 import pandas as pd
 from gensim import corpora
-from gensim.matutils import corpus2csc
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics import silhouette_score
 from preprocessing.Tokenizer import SplitTokenizer
 from utils.Utils import load_list_from_file, get_stopwords
-import numpy as np
+
 
 token_number = 8
 input = "/Users/lgu/Desktop/NOTime/EKR/Corpus_lod_4/sources.txt"
@@ -33,8 +31,8 @@ stop = get_stopwords("stopwords.txt")
 
 #print(corpus_tfidf[0])
 
-X = corpus2csc(corpus_tfidf)
-exit()
+#X = corpus2csc(corpus_tfidf)
+#exit()
 
 sources = pd.read_csv(input, sep='\t', header=None, usecols=[0, 1])
 
