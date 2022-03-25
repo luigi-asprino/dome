@@ -36,9 +36,10 @@ def get_irlb(df):
             irpl[column] = vc[1]
         else:
             irpl[column] = 0
-    irpl = max(irpl) / [i for i in irpl if i > 0]
+    irpl = max(irpl) / [i if i > 0 else 1 for i in irpl]
     mir = np.average(irpl)
     return irpl, mir
+
 
 def get_tail_label(df):
     """
@@ -54,9 +55,19 @@ def get_tail_label(df):
     n = len(columns)
     irpl = np.zeros(n)
     for column in range(n):
-        irpl[column] = df[columns[column]].value_counts()[1]
-    irpl = max(irpl) / irpl
+        # print(column)
+        # print(columns[column])
+        # print(df[columns[column]].value_counts())
+        vc = df[columns[column]].value_counts()
+        if len(vc) > 1:
+            irpl[column] = vc[1]
+        else:
+            print(f"Column {columns[column]} without examples!")
+            irpl[column] = 0
+    irpl = max(irpl) / [i if i > 0 else 1 for i in irpl]
+    # print(irpl)
     mir = np.average(irpl)
+    # print(mir)
     tail_label = []
     for i in range(n):
         if irpl[i] > mir:
@@ -74,6 +85,7 @@ def get_index(df):
     index: list, a list containing index number of all the tail label
     """
     tail_labels = get_tail_label(df)
+    # print(f"Tail labels {tail_labels}")
     index = set()
     for tail_label in tail_labels:
         sub_index = set(df[df[tail_label] == 1].index)
@@ -150,7 +162,6 @@ def augment(X, y, n_sample=None):
     return new_X, target
 
 
-
 def MLSMOTE(X, y, n_sample=None):
     print(f"IRMean {get_irlb(y)[1]} {len(X)} {len(y)}")
     X_sub, y_sub = get_minority_instace(X, y)
@@ -161,28 +172,32 @@ def MLSMOTE(X, y, n_sample=None):
     print(f"IRMean {irlb_mean_last} {len(X_res)} {len(y_res)}")
     return X_res, y_res
 
-def MLSMOTE_iterative(X, y, threshold=None):
+
+def MLSMOTE_iterative(X, y, threshold=None, cp=False):
     X_i = X
     y_i = y
     # setting seed for reproducibility purpose
     random.seed(42)
     #print(random.getstate())
     irlb, irlb_mean_last = get_irlb(y_i)
-    print(f"Initial IRMean {irlb_mean_last}")
+    print(f"Initial Avg. Imbalance Ratio {irlb_mean_last}")
     while True:
         X_sub, y_sub = get_minority_instace(X_i, y_i)
-        X_res, y_res = augment(X_sub, y_sub)
+        if cp:
+            X_res, y_res = X_sub, y_sub
+        else:
+            X_res, y_res = augment(X_sub, y_sub)
         X_cur = pd.concat([X, X_res])
         y_cur = pd.concat([y, y_res])
         irlb, irlb_mean_cur = get_irlb(y_cur)
-        print(f"Current IRMean {irlb_mean_cur}")
+        print(f"Current Avg. Imbalance Ratio {irlb_mean_cur}")
         if (threshold is None and irlb_mean_cur < irlb_mean_last) \
                 or (threshold is not None and irlb_mean_cur > threshold):
             X_i = X_cur
             y_i = y_cur
             irlb_mean_last = irlb_mean_cur
         else:
-            print(f"Final IRMean {irlb_mean_last}")
+            print(f"Current Avg. Imbalance Ratio {irlb_mean_last}")
             break
     return X_i, y_i
 

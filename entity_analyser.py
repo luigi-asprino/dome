@@ -39,6 +39,7 @@ def get_domain_vector(entity, domain_model, id2doc):
 
     return np.zeros(domain_model[0].shape[0])
 
+
 if __name__ == '__main__':
     import argparse
 
@@ -64,8 +65,7 @@ if __name__ == '__main__':
 
     empty_entities = load_list_from_file(args.empty_entities_path )
     doc_ids = load_list_from_file(args.input_folder_corpus + "/doc_ids", extractid=True)
-    #logger.debug(doc_ids)
-    id2doc = {k : v for v,k in enumerate(doc_ids)}
+    id2doc = {k: v for v, k in enumerate(doc_ids)}
     domain_model = pickle.load(open(args.domain_model, "rb"))
     id_to_domain = pickle.load(open(args.id_to_domain, "rb"))
 
@@ -84,9 +84,9 @@ if __name__ == '__main__':
             zero_vector_datasets.append(doc_ids[id])
             zero_vector_dataset_ids.append(id)
 
-    counter = {id_to_domain[id] : 0  for id in id_to_domain}
+    counter = {id_to_domain[i]: 0 for i in id_to_domain}
 
-    counter_datasets = {id_to_domain[id]: 0 for id in id_to_domain}
+    counter_datasets = {id_to_domain[i]: 0 for i in id_to_domain}
 
     if not args.limit:
         limit = len(empty_entities)
@@ -96,26 +96,30 @@ if __name__ == '__main__':
 
     cnt = 0
 
-    for id_entity in range(0,limit):
+    for id_entity in range(0, limit):
 
-        if cnt%10000==0:
+        if cnt % 10000 == 0:
             logger.info(f"{cnt}/{limit}")
 
-        cnt = cnt +1
+        cnt = cnt + 1
 
         datasets = db.get(empty_entities[id_entity].encode())
 
         if datasets is  None:
-            not_found +=1
+            not_found += 1
             continue
 
         datasets = datasets.decode().split(",")
 
-        d = np.zeros((len(datasets),len(id_to_domain)))
+        print(id_entity)
+        print(empty_entities[id_entity])
+        print(datasets)
+        exit(0)
+
+        d = np.zeros((len(datasets), len(id_to_domain)))
 
         for idx, id_doc in enumerate(datasets):
             if id_doc in id2doc:
-                #logger.debug(f"{id_doc} {id2doc[id_doc]} {domain_model[id2doc[id_doc]]}")
                 d[idx] = domain_model[id2doc[id_doc]]
             else:
                 logger.debug(f"Couldn't find {id_doc}")

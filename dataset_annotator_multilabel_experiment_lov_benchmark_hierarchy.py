@@ -22,12 +22,16 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import hamming_loss, accuracy_score, f1_score
 from sklearn_hierarchical_classification.constants import ROOT
+
+from utils import ml_utils
 from utils.Utils import load_map_from_file, load_list_from_file, load_vectors_from_file, get_stopwords
 from utils.ml_utils import get_irlb, write_class_distribution_on_file, specialize_annotations, \
-    get_indexes_of_items_with_labels, \
-    resample, DomainTransformer, Strategies
+    get_indexes_of_items_with_labels, oversampling, \
+    DomainTransformer, Strategies
 from utils.corpora import get_doc
 import warnings
+
+
 
 
 warnings.filterwarnings('ignore')  # "error", "ignore", "always", "default", "module" or "once"
@@ -45,7 +49,7 @@ logger = logging.getLogger(__name__)
 id_to_domain = "/Users/lgu/workspace/ekr/dome/resources/20211126_input_unified/id2domain.tsv"
 input_folder_corpus = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/Corpus_lov"
 token_number = 8
-n_sample = 400
+n_sample = 100
 uri_to_doc_id_file = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/output/index.tsv"
 gold_standard = "/Users/lgu/Desktop/NOTime/EKR/LOV_experiment/LOV_KD_annotations.tsv"
 gold_standard_LOV_max = "/Users/lgu/Google Drive/Lavoro/Progetti/EKR/Annotation/LOV/TSVs/maximal_annotation_set.p"
@@ -89,16 +93,16 @@ class_hierarchy = {
 all_classes = set([v for k, vs in class_hierarchy.items() for v in vs])
 all_classes.update([k for k, v in class_hierarchy.items()])
 
-resampling_strategy = Strategies.MLSMOTE
+resampling_strategy = Strategies.OVERSAMPLING
 use_hierarchy = False
-use_tfidf = False
+use_tfidf = True
 use_domain_annotator = False
 on_LOV = True
 on_Bench = True
 on_LOD_Laundromat = True
 flash = False
 only_top_level = False
-use_feature_selection = True
+use_feature_selection = False
 MAXIMAL = "maximal"
 INTERSECTION = "intersection"
 intersection_or_maximal = MAXIMAL
@@ -338,59 +342,62 @@ else:
     y = pickle.load(open(folder + "y_pre.p", "rb"))
     print("Loaded..")
 
+specialize_annotations(y[0], hierarchy, domain_to_id)
 
-if not os.path.exists(folder + resampling_strategy):
+counter, counter_ordered, label_to_annotation_set = \
+        write_class_distribution_on_file(y, folder +"class_distribution.tsv")
 
-    specialize_annotations(y[0], hierarchy, domain_to_id)
+counter, counter_ordered, label_to_annotation_set = \
+        write_class_distribution_on_file(y, folder + "class_distribution_after_downsampling.tsv")
 
-    counter, counter_ordered = write_class_distribution_on_file(y, folder + "class_distribution.tsv")
+X, y = ml_utils.undersampling(X, y)
 
-    majority_class = counter_ordered[0][0]
-    majority_class_size = counter_ordered[0][1]
-    downsize = counter_ordered[5][1]
-    majority_class_indexes = get_indexes_of_items_with_labels(y[0], [majority_class])
-    a = random.sample(majority_class_indexes, downsize)
-    indexes_to_remove = [idx for idx in majority_class_indexes if idx not in a]
+mlb = MultiLabelBinarizer()
+y = mlb.fit_transform(y[0])
+X = csr_matrix(X.values)
 
-    print(f"Majority class {majority_class} of size {majority_class_size} to "
-          f"be downsized to {downsize} {len(a)} {len(indexes_to_remove)}")
-
-    print(f"{len(X)} {len(y)}")
-
-    X = X.drop(indexes_to_remove).reset_index()
-    y = y.drop(indexes_to_remove).reset_index()
-
-    print(f"{len(X)} {len(y)} {len(y[0])}")
-
-    os.mkdir(folder+resampling_strategy)
-    mlb = MultiLabelBinarizer()
-    y = pd.DataFrame(mlb.fit_transform(y[0]))
-
-    if use_feature_selection:
-        X = csr_matrix(X.values)
-        X = SelectPercentile(chi2).fit_transform(X, y)
-        X = pd.DataFrame(X.toarray())
-
-    # Resampling
-    X, y = resample(X, y, stategy=resampling_strategy, n_sample=n_sample)
-
-    irlb, irlb_mean_last = get_irlb(y)
-    mess = f"IRLB mean {irlb_mean_last} number of samples {n_sample}"
-    f = open(folder + resampling_strategy + "/irlb_mean.txt", 'w')
-    f.write(mess)
-
-    y = y.values
-    X = csr_matrix(X.values)
-
-    print("Dumping X and y")
-    pickle.dump(X, open(folder + resampling_strategy + "/X.p", "wb"))
-    pickle.dump(y, open(folder + resampling_strategy + "/y.p", "wb"))
-    pickle.dump(mlb, open(folder + resampling_strategy + "/mlb.p", "wb"))
-else:
-    print("Loading X and y")
-    X = pickle.load(open(folder + resampling_strategy + "/X.p", "rb"))
-    y = pickle.load(open(folder + resampling_strategy + "/y.p", "rb"))
-    mlb = pickle.load(open(folder + resampling_strategy + "/mlb.p", "rb"))
+# if not os.path.exists(folder + resampling_strategy):
+#
+#     specialize_annotations(y[0], hierarchy, domain_to_id)
+#
+#     counter, counter_ordered, label_to_annotation_set = \
+#         write_class_distribution_on_file(y, folder +"class_distribution.tsv")
+#
+#     X, y = ml_utils.undersampling(X, y)
+#
+#     counter, counter_ordered, label_to_annotation_set = \
+#         write_class_distribution_on_file(y, folder + "class_distribution_after_downsampling.tsv")
+#
+#     print(f"len(X): {len(X)} len(y): {len(y)}")
+#
+#     os.mkdir(folder+resampling_strategy)
+#     mlb = MultiLabelBinarizer()
+#     y = pd.DataFrame(mlb.fit_transform(y[0]))
+#     # irlb, irlb_mean = get_irlb(y)
+#     # print(irlb_mean)
+#     #
+#     # if use_feature_selection:
+#     #     X = csr_matrix(X.values)
+#     #     X = SelectPercentile(chi2).fit_transform(X, y)
+#     #     X = pd.DataFrame(X.toarray())
+#     #
+#     # irlb, irlb_mean_last = get_irlb(y)
+#     # mess = f"IRLB mean {irlb_mean_last} number of samples {n_sample}"
+#     # f = open(folder + resampling_strategy + "/irlb_mean.txt", 'w')
+#     # f.write(mess)
+#
+#     y = y.values
+#     X = csr_matrix(X.values)
+#
+#     print("Dumping X and y")
+#     pickle.dump(X, open(folder + resampling_strategy + "/X.p", "wb"))
+#     pickle.dump(y, open(folder + resampling_strategy + "/y.p", "wb"))
+#     pickle.dump(mlb, open(folder + resampling_strategy + "/mlb.p", "wb"))
+# else:
+#     print("Loading X and y")
+#     X = pickle.load(open(folder + resampling_strategy + "/X.p", "rb"))
+#     y = pickle.load(open(folder + resampling_strategy + "/y.p", "rb"))
+#     mlb = pickle.load(open(folder + resampling_strategy + "/mlb.p", "rb"))
 
 # Test train split
 classifiers = [
@@ -405,7 +412,7 @@ for clf in classifiers:
     if hasattr(clf, 'estimator'):
         estimator = f"{clf.__class__.__name__}-{clf.estimator.__class__.__name__}"
 
-    estimator_folder = folder + resampling_strategy + "/" + estimator
+    estimator_folder = folder + "/" + estimator
 
     if not os.path.exists(estimator_folder):
         os.mkdir(estimator_folder)
@@ -413,7 +420,6 @@ for clf in classifiers:
         print(f"Skipping {estimator}")
         continue
 
-    # scoring = "f1_weighted"
     mskf = MultilabelStratifiedKFold(n_splits=10, shuffle=True, random_state=42)
     f = open(estimator_folder + '/results.txt', 'w')
     computed_metrics = {"hls": [], "accs": [], "f1_micro": [], "f1_macro": [], "f1_weight": []}
@@ -423,6 +429,13 @@ for clf in classifiers:
         n_fold += 1
         X_train, X_test = X[train_index], X[test_index]
         y_train, y_test = y[train_index], y[test_index]
+
+        X_train = pd.DataFrame(X_train.toarray()).reset_index(drop=True)
+        y_train = pd.DataFrame(y_train).reset_index(drop=True)
+
+        X_train, y_train = oversampling(X_train, y_train)
+        X_train = csr_matrix(X_train.values)
+        y_train = y_train.values
 
         clf.fit(X_train, y_train)
         y_test_pred = clf.predict(X_test)

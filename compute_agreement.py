@@ -33,19 +33,35 @@ def code_coder(vocs, dict, domain2id, hierarchy={}):
 
 def counter(annotations):
     counter = {}
+    counter_combined = {}
     for dataset, annotation_set in annotations.items():
+        annotation_lab = " ".join(annotation_set)
+
+        if annotation_lab in counter_combined:
+            counter_combined[annotation_lab] = counter_combined[annotation_lab] + 1
+        else:
+            counter_combined[annotation_lab] = 1
+
         for annotation in annotation_set:
             if annotation in counter:
                 counter[annotation] = counter[annotation] + 1
             else:
                 counter[annotation] = 1
 
-    for domain, count in counter.items():
+    print("\n\nCounter singular\n\n")
+    for domain, count in sorted(counter_combined.items(), key=lambda item: item[1], reverse=True):
         print(f"{domain}\t{count}")
+
+    print("\n\nCounter singular\n\n")
+    for domain, count in sorted(counter.items(), key=lambda item: item[1], reverse=True):
+        print(f"{domain}\t{count}")
+
+
 
 def compute_krippendorff(vocs, coders, domain2id, hierarchy, outfolder, verbose, threshold_reliability = 0.66):
     vocs_reliable = []
     vocs_annotated = set()
+    cross_domain_by_all = 0
 
     for voc in vocs:
         vector_exists = False
@@ -57,8 +73,8 @@ def compute_krippendorff(vocs, coders, domain2id, hierarchy, outfolder, verbose,
                     has_annotations = True
                     vocs_annotated.add(voc)
 
-
         if not vector_exists or not has_annotations:
+            cross_domain_by_all = cross_domain_by_all + 1
             if verbose:
                 print(f"Krippendorff's alpha for {voc}: 1.0")
         else:
@@ -76,7 +92,6 @@ def compute_krippendorff(vocs, coders, domain2id, hierarchy, outfolder, verbose,
                 vocs_reliable.append(voc)
                 if verbose:
                     print("RELIABLE")
-
 
     reliability_data = np.array([code_coder(vocs, c, domain2id, hierarchy) for c in coders])
     reliability_data_reliable_only = np.array([code_coder(vocs_reliable, c, domain2id, hierarchy) for c in coders])
@@ -118,24 +133,26 @@ def compute_krippendorff(vocs, coders, domain2id, hierarchy, outfolder, verbose,
     pickle.dump(intersection_annotations, open(outfolder+"intersection_annotations.p", "wb"))
     pickle.dump(maximal_annotation_set, open(outfolder+"maximal_annotation_set.p", "wb"))
 
-    print(f"Number of reliable datasets {len(vocs_reliable)}/{len(vocs)}")
-    print(f"Number of annotated datasets  {len(vocs_annotated)}/{len(vocs)}")
-    print(f"Number of datates with annotations and reliable "
-          f"{len(set(vocs_reliable).intersection(set(vocs_annotated)))}/{len(vocs)}")
-    print(f"Reliable vocabularies with empty intersection among {empty_intersection}")
-    print(f"Krippendorff's alpha for all vocabulaires: {krippendorff.alpha(reliability_data=reliability_data)}")
-    print(f"Krippendorff's alpha for reliable vocabulaires: "
-          f"{krippendorff.alpha(reliability_data=reliability_data_reliable_only)} ")
 
-    print("\nIntersection set")
-    counter(intersection_annotations)
+
+    #print("\nIntersection set")
+    #counter(intersection_annotations)
 
     print("\nMaximal set")
     counter(maximal_annotation_set)
 
-    for dataset in vocs:
-        print(dataset)
+    #for dataset in vocs:
+    #    print(dataset)
 
+    print(f"\n\nNumber of datasets identified as cross domain by all the annotators {cross_domain_by_all}")
+    print(f"Number of reliable datasets {len(vocs_reliable)}/{len(vocs)}")
+    # print(f"Number of annotated datasets  {len(vocs_annotated)}/{len(vocs)}")
+    print(f"Number of datates with annotations and reliable "
+          f"{len(set(vocs_reliable).intersection(set(vocs_annotated)))}/{len(vocs)}")
+    # print(f"Reliable vocabularies with empty intersection among {empty_intersection}")
+    print(f"Krippendorff's alpha for all vocabulaires: {krippendorff.alpha(reliability_data=reliability_data)}")
+    print(f"Krippendorff's alpha for reliable vocabulaires: "
+          f"{krippendorff.alpha(reliability_data=reliability_data_reliable_only)} ")
 
 
 def main():
@@ -236,10 +253,10 @@ def main():
     coders = [c1, c2, c3, c4, c5, c6, c7]
     coders_lod = [lod_c11, lod_c12, lod_c13, lod_c21, lod_c22, lod_c23, lod_c01, lod_c02, lod_c03]
 
-    #compute_krippendorff(vocs, coders, domain2id, hierarchy,
-    #                     "/Users/lgu/Google Drive/Lavoro/Progetti/EKR/Annotation/LOV/", False)
-    compute_krippendorff(datasets_ids, coders_lod, domain2id, hierarchy,
-                         "/Users/lgu/Google Drive/Lavoro/Progetti/EKR/Annotation/Laundromat/", False, 0.66)
+    compute_krippendorff(vocs, coders, domain2id, hierarchy,
+                         "/Users/lgu/Google Drive/Lavoro/Progetti/EKR/Annotation/LOV/", False)
+    #compute_krippendorff(datasets_ids, coders_lod, domain2id, hierarchy,
+    #                     "/Users/lgu/Google Drive/Lavoro/Progetti/EKR/Annotation/Laundromat/", False, 0.66)
 
     # vocs_reliable=[]
     # vocs_annotated=[]
